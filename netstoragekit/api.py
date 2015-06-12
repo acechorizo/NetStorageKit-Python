@@ -16,16 +16,34 @@ log = logging.getLogger(__name__)
 
 
 def reraise_exception(exception):
+    """Reraises the given exception wrapped in our NetStorageKitError.
+    The original exception information is preserved.
+    """
     type_, value, traceback = sys.exc_info()
     raise NetStorageKitError, '%s(%s)' % (type_.__name__, value), traceback
 
 
 class Request(object):
+    """An authenticated request to the NetStorage API."""
 
-    def __init__(self, key_name, key, cpcode,
-                 secure=True, host=None,
-                 timestamp=None, unique_id=None,
-                 testing=None):
+    def __init__(self, key_name, key, cpcode, secure=True, host=None,
+                 timestamp=None, unique_id=None, testing=None):
+        """Request initializer.
+
+        Args:
+            key_name: The NS Upload Account key_name as configured in Luna.
+            key: The NS Upload Account key as configured in Luna.
+            cpcode: The CPCode.
+            secure: Whether or not to use a secured connection (SSL).
+            host: Optional hostname (for testing purposes).
+            timestamp: Optional timestamp (for testing purposes).
+            unique_id: Optional unique identifier (for testing purposes).
+            testing: Dictionary to mock the responses. Available items include:
+                - status: The mock HTTP status code.
+                - content_type: The mock content_type response header.
+                - body: The mock response body.
+
+        """
         self.key_name = key_name
         self.key = key
         self.cpcode = cpcode
@@ -40,6 +58,15 @@ class Request(object):
             log.debug('Testing mode activated: %s' % self.testing)
 
     def get_action_header(self, action, **parameters):
+        """Gets the X-Akamai-ACS-Action header.
+
+        Args:
+            action: The action name to perform, e.g. "upload".
+            **parameters: Parameters for the action, e.g. "md5=abcdef12345678abcdef"
+
+        Returns:
+            The action header as a dict.
+        """
         values = {'version': 1, 'action': action}
         values.update(parameters)
         # The query string parameters must be sorted alphabetically
@@ -48,15 +75,41 @@ class Request(object):
         return {'X-Akamai-ACS-Action': value}
 
     def get_data_header(self):
+        """Gets the X-Akamai-ACS-Auth-Data header.
+
+        Returns:
+            The data header as a dict.
+        """
         value = get_data(self.key_name,
                          timestamp=self.timestamp, unique_id=self.unique_id)
         return {'X-Akamai-ACS-Auth-Data': value}
 
     def get_sign_header(self, path, data, action):
+        """Gets the X-Akamai-ACS-Auth-Sign header.
+
+        Args:
+            path: The remote path, without cpcode.
+            data: The data header value.
+            action: The action header value.
+
+        Returns:
+            The sign header as a dict.
+        """
         value = get_sign(self.key, path, data, action)
         return {'X-Akamai-ACS-Auth-Sign': value}
 
     def get_headers(self, path, action, **parameters):
+        """Gets all the headers needed to perform an authenticated request.
+            Currently: user-agent, action, data and sign headers.
+
+        Args:
+            path: The remote path, without cpcode.
+            action: The API action name, e.g. "du".
+            **parameters: Additional parameters to the given action.
+
+        Returns:
+            A dict of headers.
+        """
         action_header = self.get_action_header(action, **parameters)
         action_value = action_header.values()[0]
         data_header = self.get_data_header()
@@ -124,9 +177,28 @@ class Request(object):
             log.error(error)
         return response
 
+    # API calls
+
     def mock(self, method='GET', path='/mock', action='mock', callback=None,
              **parameters):
-        response = self._send('GET', path, 'mock', callback=callback, **parameters)
+        """Mock API call, using the responses package.
+
+        This method doesn't make any HTTP connections.
+
+        Args:
+            method: The mock HTTP method in uppercase.
+            path: The mock remote path, without cpcode.
+            action: The mock API action name.
+            callback: Optional callback to process the mock response.
+            **parameters: Additional parameters to the given mock action, e.g.
+                'mtime=1260000000' for the 'mtime' action.
+
+        Returns:
+            A tuple consisting of:
+            1. The relevant data as a dict, currently just None.
+            2. The mock response as returned by requests.
+        """
+        response = self._send('GET', path, action, callback=callback, **parameters)
         return None, response
 
     def du(self, path, callback=None):
