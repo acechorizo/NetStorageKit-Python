@@ -126,3 +126,35 @@ class Request(object):
              **parameters):
         response = self._send('GET', path, 'mock', callback=callback, **parameters)
         return None, response
+
+    def du(self, path, callback=None):
+        """Directory Usage.
+
+        Gets the number of files and total bytes inside the provided path.
+
+        Example response:
+            <du directory="/dir1/dir2">
+                <du-info files="12399999" bytes="383838383838"/>
+            </du>
+
+        Args:
+            path: The remote path, without cpcode.
+            callback: Optional callback to process the response further.
+
+        Returns:
+            A tuple consisting of:
+            1. The relevant data (parsed xml) as a dict.
+            2. The response as returned by requests.
+
+        Raises:
+            NetStorageKitError: A wrapper of any XML parsing error.
+        """
+        response = self._send('GET', path, 'du', callback=callback)
+        data = None
+        try:
+            xml = et.fromstring(response.text)
+            data = xml.find('du-info').attrib
+        except (et.ParseError, AttributeError), e:
+            log.critical('[101] Failed to parse response: ' + e.message)
+            reraise_exception(e)
+        return data, response
