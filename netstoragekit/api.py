@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import logging
-from urllib import urlencode
+from urllib import quote_plus
 import requests
 import responses
 from .exceptions import NetStorageKitError
@@ -40,9 +40,11 @@ class Request(object):
             log.debug('Testing mode activated: %s' % self.testing)
 
     def get_action_header(self, action, **parameters):
-        value = {'version': 1, 'action': action}
-        value.update(parameters)
-        value = urlencode(value)
+        values = {'version': 1, 'action': action}
+        values.update(parameters)
+        # The query string parameters must be sorted alphabetically
+        # for testing purposes
+        value = '&'.join(['%s=%s' % (k, values[k]) for k in sorted(values)])
         return {'X-Akamai-ACS-Action': value}
 
     def get_data_header(self):
@@ -58,7 +60,7 @@ class Request(object):
         action_header = self.get_action_header(action, **parameters)
         action_value = action_header.values()[0]
         data_header = self.get_data_header()
-        data_value = action_header.values()[0]
+        data_value = data_header.values()[0]
         sign_header = self.get_sign_header(path, data_value, action_value)
         headers = {
             'User-Agent': 'NetStorageKit-Python/1.0'
@@ -128,7 +130,7 @@ class Request(object):
         return None, response
 
     def du(self, path, callback=None):
-        """Directory Usage.
+        """Disk Usage.
 
         Gets the number of files and total bytes inside the provided path.
 

@@ -10,28 +10,37 @@ logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 
 
 def test_http_headers():
-    key_name = 'key1'
-    key = 'abcdefghij'
+    key_name = 'test-key'
+    key = '123'
     cpcode = '12345'
     path = '/dir1/dir2/file.html'
-    action = 'version=1&action=upload&md5=0123456789abcdef0123456789abcdef&mtime=1260000000'
 
+    # the action parameters should be assembled in alphabetical order
+    expected_action = 'action=upload&md5=0123456789abcdef0123456789abcdef&mtime=1260000000&version=1'
     expected_data = '5, 0.0.0.0, 0.0.0.0, 1280000000, 382644692, %s' % key_name
-    expected_sign = 'vuCWPzdEW5OUlH1rLfHokWAZAWSdaGTM8yX3bgIDWtA='
+    expected_sign = '8XSSLmZqQz8FDHBqvswtQIVu4JYwxO5E6sJwGXMtY6o='
 
+    # Test auth functions
+
+    # Should accept numeric or string parameters
     data = ns.auth.get_data(key_name, timestamp=1280000000, unique_id=382644692)
-    sign = ns.auth.get_sign(key, path, expected_data, action)
+    sign = ns.auth.get_sign(key, path, expected_data, expected_action)
 
     assert data == expected_data
     assert sign == expected_sign
 
+    # Test auth function calls inside Request
+
     request = ns.api.Request(key_name, key, cpcode,
                              timestamp='1280000000', unique_id='382644692',
                              testing=True)
-    _, r = request.mock(path=path, action='upload')
-    assert r.request.headers['X-Akamai-ACS-Action'] == action
-    assert r.request.headers['X-Akamai-ACS-Auth-Data'] == data
-    assert r.request.headers['X-Akamai-ACS-Auth-Sign'] == sign
+    parameters = {'md5': '0123456789abcdef0123456789abcdef', 'mtime': '1260000000'}
+    _, r = request.mock(path=path, action='upload', **parameters)
+
+    assert r.request.headers['X-Akamai-ACS-Action'] == expected_action
+    assert r.request.headers['X-Akamai-ACS-Auth-Data'] == expected_data
+    assert r.request.headers['X-Akamai-ACS-Auth-Sign'] == expected_sign
+
 
 def test_http_responses():
 
@@ -76,6 +85,8 @@ def test_api_du():
     request = ns.api.Request('test-key', '123', '12345', testing=mock_response)
     data, response = request.du('/du/foo')
     assert response.status_code == 200
+    assert data['files'] == '12399999'
+    assert data['bytes'] == '383838383838'
 
     # Invalid response (unclosed tag)
     invalid_mock_response_body = """
