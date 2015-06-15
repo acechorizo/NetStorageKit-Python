@@ -237,8 +237,12 @@ class Request(object):
         Raises:
             NetStorageKitError: A wrapper of any XML parsing error.
         """
-        response = self._send('GET', path, 'du', callback=callback)
         data = None
+        response = self._send('GET', path, 'du', callback=callback)
+
+        if response.status_code != 200:
+            return data, response
+
         try:
             xml = et.fromstring(response.text)
             data = xml.find('du-info').attrib
