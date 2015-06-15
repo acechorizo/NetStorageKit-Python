@@ -26,7 +26,7 @@ def reraise_exception(exception):
 class Request(object):
     """An authenticated request to the NetStorage API."""
 
-    def __init__(self, key_name, key, cpcode, secure=True, host=None,
+    def __init__(self, key_name, key, cpcode, host, secure=True,
                  timestamp=None, unique_id=None, testing=None):
         """Request initializer.
 
@@ -34,8 +34,8 @@ class Request(object):
             key_name: The NS Upload Account key_name as configured in Luna.
             key: The NS Upload Account key as configured in Luna.
             cpcode: The CPCode.
+            host: Hostname preffix, e.g. "media" in "media-nsu.akamaihd.net".
             secure: Whether or not to use a secured connection (SSL).
-            host: Optional hostname (for testing purposes).
             timestamp: Optional timestamp (for testing purposes).
             unique_id: Optional unique identifier (for testing purposes).
             testing: Dictionary to mock the responses. Available items include:
@@ -47,8 +47,8 @@ class Request(object):
         self.key_name = key_name
         self.key = key
         self.cpcode = cpcode
+        self.host = '%s-nsu.akamaihd.net' % host
         self.secure = secure
-        self.host = host or (self.key_name + '-nsu.akamaihd.net')
 
         self.timestamp = timestamp
         self.unique_id = unique_id
