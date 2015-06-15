@@ -15,6 +15,19 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 
+def _format_headers(headers, prefix=''):
+    return '\n'.join(['%s%s: %s' % (prefix, k, v)
+                      for k, v in headers.items()])
+
+def _format_response(response):
+    raw_response = 'Request:\n%s\n%s\nResponse:\n%s\nBody:\n%s' % (
+        response.url,
+        _format_headers(response.request.headers, '> '),
+        _format_headers(response.headers, '< '),
+        response.text)
+    return raw_response
+
+
 def reraise_exception(exception):
     """Reraises the given exception wrapped in our NetStorageKitError.
     The original exception information is preserved.
@@ -173,8 +186,9 @@ class Request(object):
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError, e:
-            error = '[%s] Failed to %s on %s' % (response.status_code, action, url)
-            log.error(error)
+            error = '[%s] Failed %s call:\n%s'
+            error %= (response.status_code, action, _format_response(response))
+            log.critical(error)
         return response
 
     # API calls
