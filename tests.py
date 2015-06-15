@@ -22,9 +22,9 @@ def test_http_headers():
 
     # Test auth functions
 
-    # Should accept numeric or string parameters
-    data = ns.auth.get_data(key_name, timestamp=1280000000, unique_id=382644692)
-    sign = ns.auth.get_sign(key, path, expected_data, expected_action)
+    # Should accept numeric, string or unicode parameters
+    data = ns.auth.get_data(unicode(key_name), timestamp=1280000000, unique_id=382644692)
+    sign = ns.auth.get_sign(unicode(key), path, expected_data, expected_action)
 
     assert data == expected_data
     assert sign == expected_sign

@@ -30,7 +30,7 @@ def get_data(key_name, timestamp=None, unique_id=None):
         # Guarantee uniqueness for headers generated at the same time
         str(unique_id or getrandbits(64)),
         key_name]
-    return ', '.join(values)
+    return str(', '.join(values))
 
 
 def get_sign(key, path, data, action):
@@ -49,6 +49,6 @@ def get_sign(key, path, data, action):
         data,
         path + '\n',
         'x-akamai-acs-action:' + action + '\n']
-    msg = ''.join(values)
-    digest = hmac.new(key, msg=msg, digestmod=hashlib.sha256).digest()
+    msg = str(''.join(values))
+    digest = hmac.new(str(key), msg=msg, digestmod=hashlib.sha256).digest()
     return digest.encode('base64').strip()
