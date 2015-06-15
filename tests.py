@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
+import os
+import json
 import logging
 import pytest
 import netstoragekit as ns
@@ -8,6 +10,29 @@ import netstoragekit as ns
 # Configure the logging level and stream to stdout to see the logs.
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 
+
+### Testing helpers
+
+def get_test_credentials():
+    # This file is installed in the home dir as a .json.dist file
+    # that the user should update in order for these tests to run
+    file = '~/netstoragekit_test_credentials.json'
+    file = os.path.expanduser(file)
+    if not os.path.exists(file):
+        return None
+    with open(file) as data:
+        test_credentials = json.load(data)
+    return test_credentials
+
+test_credentials = get_test_credentials()
+
+
+# Decorator that runs tests only if there are test credentials
+real_http_request = pytest.mark.skipif(test_credentials is None,
+    reason='The test credentials .json file was not found in ~')
+
+
+### Tests
 
 def test_http_headers():
     key_name = 'test-key'
@@ -73,6 +98,22 @@ def test_http_responses():
     assert response.status_code == 404
     assert 'Not Found' in str(response.text)
 
+
+@real_http_request
+def test_real_http_failed_responses():
+    test = test_credentials
+
+    # Service unavailable
+    request = ns.api.Request('invalid_key_name', 'invalid_key',
+                             'invalid_cpcode', 'invalid_host')
+    data, response = request.du('/')
+    assert data is None and response.status_code == 503
+
+    # Forbidden
+    request = ns.api.Request(test['key_name'], 'INVALID_KEY',
+                             test['cpcode'], test['host'])
+    data, response = request.du('/')
+    assert data is None and response.status_code == 403
 
 def test_api_du():
     # Valid response
