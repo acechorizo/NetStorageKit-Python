@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from os.path import expanduser
 from setuptools import setup
 
 setup(
@@ -11,5 +12,6 @@ setup(
         'requests',
         'responses',
         'pytest'
-    ]
+    ],
+    data_files=[(expanduser('~'), ['netstoragekit_test_credentials.json.dist'])]
 )
