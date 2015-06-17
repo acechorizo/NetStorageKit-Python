@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
-import sys
 import logging
-from urllib import quote_plus
 import requests
 import responses
 from .exceptions import NetStorageKitError
 from .auth import get_data, get_sign
-from .utils import format_response, reraise_exception, get_remote_path
+from .utils import format_response, get_remote_path, reraise_exception, xml_to_data
 try:
     import xml.etree.cElementTree as et
 except ImportError:
@@ -176,6 +174,30 @@ class Request(object):
             log.critical(error)
         return response
 
+    def _send_read_action(self, path, action, callback=None, **parameters):
+        """Sends a read-only API request and parses its response.
+
+        See _send.
+
+        Returns:
+            A Tuple (data, response) where data is a Data (dictionary with
+            attribute-like access too) object with the translated response xml
+            content, and response is the object as returned by requests.
+        """
+        data = None
+        response = self._send('GET', path, action, callback=callback, **parameters)
+        if response.status_code != 200:
+            return data, response
+        try:
+            body = response.text.strip()
+            if body:
+                xml = et.fromstring(body)
+                data = xml_to_data(xml)
+        except (et.ParseError, AttributeError), e:
+            log.critical('[101] Failed to parse response: ' + e.message)
+            reraise_exception(e)
+        return data, response
+
     # API calls
     # All paths should be relative to the CPCode directory
 
@@ -198,8 +220,7 @@ class Request(object):
             1. The relevant data as a dict, currently just None.
             2. The mock response as returned by requests.
         """
-        response = self._send('GET', path, action, callback=callback, **parameters)
-        return None, response
+        return self._send_read_action(path, action, callback=None, **parameters)
 
     def du(self, path, callback=None):
         """Disk Usage.
@@ -210,6 +231,11 @@ class Request(object):
             <du directory="/dir1/dir2">
                 <du-info files="12399999" bytes="383838383838"/>
             </du>
+
+        Example parsed data returned:
+            {'du': {'directory': '/dir1/dir2/',
+                    'du-info': {'files': '12399999',
+                                'bytes': '383838383838'}}}
 
         Args:
             path: The remote path, without CPCode.
@@ -223,16 +249,37 @@ class Request(object):
         Raises:
             NetStorageKitError: A wrapper of any XML parsing error.
         """
-        data = None
-        response = self._send('GET', path, 'du', callback=callback)
+        return self._send_read_action(path, 'du', callback=None)
 
-        if response.status_code != 200:
-            return data, response
+    def dir(self, path, callback=None):
+        """Directory structure.
 
-        try:
-            xml = et.fromstring(response.text)
-            data = xml.find('du-info').attrib
-        except (et.ParseError, AttributeError), e:
-            log.critical('[101] Failed to parse response: ' + e.message)
-            reraise_exception(e)
-        return data, response
+        Gets the directory structure of the provided path.
+
+        Example response:
+            <stat directory="/dir/foo">
+                <file type="file" name="a.jpg" mtime="1395977462"
+                      size="123" md5="d41d8cd98f00b204e9800998ecf8427e"/>
+                <file type="file" name="b.png" mtime="1395977461"
+                      size="123" md5="d41d8cd98f00b204e9800998ecf8427e"/>
+                <file type="dir" name="test2" mtime="1395977462"/>
+            </stat>
+
+        Example parsed data returned:
+            {'stat': {'directory': '/12345',
+                      'file': [{'type': 'dir', 'name': 'dir_a', 'mtime': '1425652079'},
+                               {'type': 'dir', 'name': 'dir_b', 'mtime': '1395977462'}]}}
+
+        Args:
+            path: The remote path, without CPCode.
+            callback: Optional callback to process the response further.
+
+        Returns:
+            A tuple consisting of:
+            1. The relevant data (parsed xml) as a dict.
+            2. The response as returned by requests.
+
+        Raises:
+            NetStorageKitError: A wrapper of any XML parsing error.
+        """
+        return self._send_read_action(path, 'dir', callback=callback)

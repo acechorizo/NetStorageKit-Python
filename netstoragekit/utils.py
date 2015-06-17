@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from sys import exc_info
+from collections import defaultdict
 from .exceptions import NetStorageKitError
 
 
@@ -45,3 +46,38 @@ def format_response(response):
         format_headers(response.headers, '< '),
         response.text)
     return raw_response
+
+
+class Data(dict):
+    """Hackish Dict with attribute-like access for the lazy.
+    This should probably be improved later.
+    """
+    __getattr__ = dict.__getitem__
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+
+def xml_to_data(xml_etree):
+    """Transforms an xml ETree into a dict.
+    Slightly modified version of http://stackoverflow.com/a/10076823/642087
+    """
+    d = Data({xml_etree.tag: Data({}) if xml_etree.attrib else None})
+    children = list(xml_etree)
+    if children:
+        dd = defaultdict(list)
+        for dc in map(xml_to_data, children):
+            for k, v in dc.iteritems():
+                dd[k].append(v)
+        dd = Data(dd)
+        d = Data({xml_etree.tag: Data({k: v[0] if len(v) == 1
+                                       else v for k, v in dd.iteritems()})})
+    if xml_etree.attrib:
+        d[xml_etree.tag].update(Data((k, v) for k, v in xml_etree.attrib.iteritems()))
+    if xml_etree.text:
+        text = xml_etree.text.strip()
+        if children or xml_etree.attrib:
+            if text:
+              d[xml_etree.tag]['text'] = text
+        else:
+            d[xml_etree.tag] = text
+    return d

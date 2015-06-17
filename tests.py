@@ -214,6 +214,7 @@ def test_real_http_successful_responses():
 def test_mock_du_response():
     # Valid response
     valid_mock_response_body = """
+    <?xml version="1.0" encoding="ISO-8859-1"?>
     <du directory="/du/foo">
         <du-info files="12399999" bytes="383838383838"/>
     </du>
@@ -222,20 +223,23 @@ def test_mock_du_response():
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
     data, response = request.du('/du/foo')
     assert response.status_code == 200
-    assert data['files'] == '12399999'
-    assert data['bytes'] == '383838383838'
+    assert data.du.directory == '/du/foo'
+    assert data.du['du-info'].files == '12399999'
+    assert data.du['du-info'].bytes == '383838383838'
 
     # Invalid response (unclosed tag)
     invalid_mock_response_body = """
+    <?xml version="1.0" encoding="ISO-8859-1"?>
     <du directory="/du/foo">
         <du-info files="12399999" bytes="383838383838">
     </du>
     """
     mock_response = {'status': 200, 'body': invalid_mock_response_body}
-    with pytest.raises(ns.exceptions.NetStorageKitError):
+    with pytest.raises(ns.exceptions.NetStorageKitError) as e:
         request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
         data, response = request.du('/du/foo')
     assert response.status_code == 200
+    assert 'ParseError' in str(e.value)
 
     # Unexpected response
     mock_response = {'status': 200, 'body': '<totally-invalid-xml>'}
@@ -246,17 +250,92 @@ def test_mock_du_response():
 
     # Incomplete response
     mock_response = {'status': 200, 'body': '<du/>'}
-    with pytest.raises(ns.exceptions.NetStorageKitError) as e:
-        request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
-        _ = request.du('/')
-    assert 'AttributeError' in str(e.value)
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    data, response = request.du('/')
+    assert data.du is None
 
 
 @real_http_request
 def test_real_du_response():
     test = test_credentials
+
+    # Valid response
     request = ns.api.Request(test['key_name'], test['key'],
                              test['cpcode'], test['host'])
-    data, r = request.du('/')
-    assert 'files' in data
-    assert 'bytes' in data
+    data, response = request.du('/')
+    assert data.du.directory.strip('/') == test['cpcode']
+    assert data.du['du-info'].files
+    assert data.du['du-info'].bytes
+
+    # Invalid response
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
+    data, response = request.du('/does-not-exist')
+    assert data is None
+    assert response.status_code == 404
+
+
+def test_mock_dir_response():
+    # Valid response
+    valid_mock_response_body = """
+    <?xml version="1.0" encoding="ISO-8859-1"?>
+    <stat directory="/dir/foo">
+        <file type="file" name="a.jpg" mtime="1395977462" size="123" md5="d41d8cd98f00b204e9800998ecf8427e"/>
+        <file type="file" name="b.png" mtime="1395977461" size="123" md5="d41d8cd98f00b204e9800998ecf8427e"/>
+        <file type="dir" name="test2" mtime="1395977462"/>
+    </stat>
+    """
+    mock_response = {'status': 200, 'body': valid_mock_response_body}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    data, response = request.dir('/dir/foo')
+    assert response.status_code == 200
+    assert data.stat.directory == '/dir/foo'
+    assert data.stat.file[0].name == 'a.jpg'
+    assert data.stat.file[1].name == 'b.png'
+    assert data.stat.file[2].name == 'test2'
+    assert data.stat.file[2].type == 'dir'
+
+    # Invalid response (unclosed tag)
+    invalid_mock_response_body = """
+    <?xml version="1.0" encoding="ISO-8859-1"?>
+    <stat directory="/dir/foo">
+        <file type="dir" name="test2" mtime="1395977462">
+    </stat>
+    """
+    mock_response = {'status': 200, 'body': invalid_mock_response_body}
+    with pytest.raises(ns.exceptions.NetStorageKitError) as e:
+        request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+        data, response = request.du('/dir/foo')
+    assert response.status_code == 200
+    assert 'ParseError' in str(e.value)
+
+    # Unexpected response
+    mock_response = {'status': 200, 'body': '<totally-invalid-xml>'}
+    with pytest.raises(ns.exceptions.NetStorageKitError) as e:
+        request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+        _ = request.dir('/')
+    assert 'ParseError' in str(e.value)
+
+    # Incomplete response
+    mock_response = {'status': 200, 'body': '<stat/>'}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    data, response = request.dir('/')
+    assert data.stat is None
+
+
+@real_http_request
+def test_real_dir_response():
+    test = test_credentials
+
+    # Valid response
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
+    data, response = request.dir('/')
+    assert data.stat.directory.strip('/') == test['cpcode']
+
+    # Invalid response
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
+    data, response = request.dir('/does-not-exist')
+    assert data is None
+    assert response.status_code == 404
