@@ -107,6 +107,16 @@ def test_http_headers():
     #assert r.request.headers['X-Akamai-ACS-Auth-Sign'] == expected_sign
 
 
+def test_http_parameters():
+
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=True)
+    # Parameters should be properly escaped as part of the action header
+    parameters = {'p1': 'Simple text', 'p2': 'mamá', 'p3': u's\xe9'}
+    _, r = request.mock(**parameters)
+    expected_quoted_params = 'p1=Simple+text&p2=mam%C3%A1&p3=s%C3%A9'
+    assert r.request.headers['X-Akamai-ACS-Action'].find(expected_quoted_params) > 0
+
+
 def test_mock_http_responses():
 
     def make_callback(code):

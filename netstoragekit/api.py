@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+from urllib import quote_plus
 import requests
 import responses
 from .exceptions import NetStorageKitError
@@ -61,9 +62,11 @@ class Request(object):
         Returns:
             The action header as a dict.
         """
+        # Escape the parameters
+        escape = lambda v: quote_plus(str(v.encode('utf-8')) if type(v) is unicode else v)
         values = {'version': 1, 'action': action, 'format': 'xml'}
-        values.update(parameters)
-        # The query string parameters must be sorted alphabetically
+        values.update({k: escape(v) for k, v in parameters.items()})
+        # The query string parameters must sorted alphabetically
         # for testing purposes
         value = '&'.join(['%s=%s' % (k, values[k]) for k in sorted(values)])
         return {'X-Akamai-ACS-Action': value}
