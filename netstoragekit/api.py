@@ -6,6 +6,7 @@ import requests
 import responses
 from .exceptions import NetStorageKitError
 from .auth import get_data, get_sign
+from .utils import format_response, reraise_exception, get_remote_path
 try:
     import xml.etree.cElementTree as et
 except ImportError:
@@ -13,27 +14,6 @@ except ImportError:
 
 
 log = logging.getLogger(__name__)
-
-
-def _format_headers(headers, prefix=''):
-    return '\n'.join(['%s%s: %s' % (prefix, k, v)
-                      for k, v in headers.items()])
-
-def _format_response(response):
-    raw_response = 'Request:\n%s\n%s\nResponse:\n%s\nBody:\n%s' % (
-        response.url,
-        _format_headers(response.request.headers, '> '),
-        _format_headers(response.headers, '< '),
-        response.text)
-    return raw_response
-
-
-def reraise_exception(exception):
-    """Reraises the given exception wrapped in our NetStorageKitError.
-    The original exception information is preserved.
-    """
-    type_, value, traceback = sys.exc_info()
-    raise NetStorageKitError, '%s(%s)' % (type_.__name__, value), traceback
 
 
 class Request(object):
@@ -66,11 +46,14 @@ class Request(object):
         self.timestamp = timestamp
         self.unique_id = unique_id
 
-        self.testing = {} if testing is True else testing
-        if self.testing:
+        # Internal flag that mocks the request when set to true
+        self._testing_mode = False
+        if testing:
+            self.testing = {} if testing is True else testing
+            self._testing_mode = True
             log.debug('Testing mode activated: %s' % self.testing)
 
-    def get_action_header(self, action, **parameters):
+    def _get_action_header(self, action, **parameters):
         """Gets the X-Akamai-ACS-Action header.
 
         Args:
@@ -80,14 +63,14 @@ class Request(object):
         Returns:
             The action header as a dict.
         """
-        values = {'version': 1, 'action': action}
+        values = {'version': 1, 'action': action, 'format': 'xml'}
         values.update(parameters)
         # The query string parameters must be sorted alphabetically
         # for testing purposes
         value = '&'.join(['%s=%s' % (k, values[k]) for k in sorted(values)])
         return {'X-Akamai-ACS-Action': value}
 
-    def get_data_header(self):
+    def _get_data_header(self):
         """Gets the X-Akamai-ACS-Auth-Data header.
 
         Returns:
@@ -97,18 +80,18 @@ class Request(object):
                          timestamp=self.timestamp, unique_id=self.unique_id)
         return {'X-Akamai-ACS-Auth-Data': value}
 
-    def get_sign_header(self, path, data, action):
+    def _get_sign_header(self, path, data, action):
         """Gets the X-Akamai-ACS-Auth-Sign header.
 
         Args:
-            path: The remote path, without cpcode.
+            path: The remote path, without CPCode.
             data: The data header value.
             action: The action header value.
 
         Returns:
             The sign header as a dict.
         """
-        value = get_sign(self.key, path, data, action)
+        value = get_sign(self.key, self.cpcode, path, data, action)
         return {'X-Akamai-ACS-Auth-Sign': value}
 
     def get_headers(self, path, action, **parameters):
@@ -116,20 +99,21 @@ class Request(object):
             Currently: user-agent, action, data and sign headers.
 
         Args:
-            path: The remote path, without cpcode.
+            path: The remote path, without CPCode.
             action: The API action name, e.g. "du".
             **parameters: Additional parameters to the given action.
 
         Returns:
             A dict of headers.
         """
-        action_header = self.get_action_header(action, **parameters)
+        action_header = self._get_action_header(action, **parameters)
         action_value = action_header.values()[0]
-        data_header = self.get_data_header()
+        data_header = self._get_data_header()
         data_value = data_header.values()[0]
-        sign_header = self.get_sign_header(path, data_value, action_value)
+        sign_header = self._get_sign_header(path, data_value, action_value)
         headers = {
-            'User-Agent': 'NetStorageKit-Python/1.0'
+            'Host': self.host,
+            'User-Agent': 'NetStorageKit-Python/1.0',
         }
         headers.update(action_header)
         headers.update(data_header)
@@ -144,7 +128,7 @@ class Request(object):
 
         Args:
             method: The HTTP method in uppercase.
-            path: The remote path, without cpcode.
+            path: The remote path, without CPCode, with/without leading/trailing slash.
             action: The API action name, e.g. "du".
             callback: Optional callback to process the response.
             **parameters: Additional parameters to the given action, e.g.
@@ -159,16 +143,17 @@ class Request(object):
 
         """
         try:
-            full_remote_path = '%s/%s' % (self.cpcode, path.strip('/'))
+            remote_path = get_remote_path(self.cpcode, path)
             protocol = 'https' if self.secure else 'http'
-            url = '%s://%s/%s' % (protocol, self.host, full_remote_path)
+            url = '%s://%s%s' % (protocol, self.host, remote_path)
             headers = self.get_headers(path, action, **parameters)
             hooks = {'response': callback} if callback else None
 
             # For testing purposes, mock the responses according to the
             # testing dict
-            if self.testing:
+            if self._testing_mode:
                 with responses.RequestsMock() as r:
+                    log.debug('Added mock response %s %s' % (method, url))
                     r.add(method, url,
                           status=self.testing.get('status', 200),
                           content_type=self.testing.get('content_type', 'text/xml'),
@@ -187,11 +172,12 @@ class Request(object):
             response.raise_for_status()
         except requests.exceptions.HTTPError, e:
             error = '[%s] Failed %s call:\n%s'
-            error %= (response.status_code, action, _format_response(response))
+            error %= (response.status_code, action, format_response(response))
             log.critical(error)
         return response
 
     # API calls
+    # All paths should be relative to the CPCode directory
 
     def mock(self, method='GET', path='/mock', action='mock', callback=None,
              **parameters):
@@ -201,7 +187,7 @@ class Request(object):
 
         Args:
             method: The mock HTTP method in uppercase.
-            path: The mock remote path, without cpcode.
+            path: The mock remote path, without CPCode.
             action: The mock API action name.
             callback: Optional callback to process the mock response.
             **parameters: Additional parameters to the given mock action, e.g.
@@ -226,7 +212,7 @@ class Request(object):
             </du>
 
         Args:
-            path: The remote path, without cpcode.
+            path: The remote path, without CPCode.
             callback: Optional callback to process the response further.
 
         Returns:
