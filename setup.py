@@ -12,6 +12,7 @@ setup(
         'requests',
         'responses',
         'pytest'
+        'requests[security]'
     ],
     data_files=[(expanduser('~'), ['netstoragekit_test_credentials.json.dist'])]
 )
