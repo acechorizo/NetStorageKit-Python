@@ -120,6 +120,28 @@ def test_api_http_headers():
     #assert r.request.headers['X-Akamai-ACS-Auth-Sign'] == expected_sign
 
 
+def test_parameters():
+
+    def response_callback(response, *args, **kwargs):
+        assert 'verify' in kwargs
+        assert response.status_code == 200
+
+    parameters_for_requests_lib = {
+        'headers': {'X-Test-Header': 'OK'},
+        'hooks': {'response': response_callback}
+    }
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=True,
+                             **parameters_for_requests_lib)
+
+    parameters_for_akamai_action = {'param1': 'test1'}
+    _, r = request.mock(**parameters_for_akamai_action)
+
+    # Test `requests.request` parameters such as headers and hooks
+    assert r.request.headers['X-Test-Header'] == 'OK'
+    # Test parameters send to the API as part of the action header
+    assert r.request.headers['X-Akamai-ACS-Action'].find('param1=test1') > 0
+
+
 def test_http_parameters():
 
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=True)
@@ -193,8 +215,30 @@ def test_real_http_failed_responses():
     data, e = request.du('/does-not-exist-%s' % time.time())
     assert data is None
     assert e.response.status_code == 404
+
+
+def test_http_timedout_responses():
+    test = test_credentials
+    # Test timeout
+
+    # Empty cpcode to request /delay/3 to httpbin.org
+    request = ns.api.Request('key', 'key_name', '', 'host', **{'timeout': .5})
+    request.host = 'httpbin.org'
+
+    # Timeout
+
+    # Timeout yields an empty response
+    data, e = request.du('/delay/4')
     assert data is None
-    assert r.status_code == 404
+    assert isinstance(e, Exception)
+    assert e.response is None
+    assert 'Read timed out' in str(e)
+
+    # OK
+    request.parameters['timeout'] = 5
+    data, r = request.du('/delay/1')
+    assert data is not None
+    assert r.status_code == 200
 
 
 @real_netstorage_api_request
