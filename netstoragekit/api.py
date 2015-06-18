@@ -173,16 +173,15 @@ class Request(object):
                                             timeout=timeout)
 
             log.debug('Request: %s %s %s' % (action, url, parameters))
-        except Exception, e:
-            log.critical('[100] Failed to send request: ' + e.message)
-            # Any exception catched here should be handled.
-            # Re-raise the exception with our own type for API consumers.
-            reraise_exception(e)
-        try:
             response.raise_for_status()
-        except requests.exceptions.HTTPError, e:
-            error = '[%s] Failed %s call:\n%s'
-            error %= (response.status_code, action, format_response(response))
+        except Exception, e:
+            error = '[%s] Failed %s call: %s'
+            if response:
+                error %= (response.status_code, action, format_response(response))
+            else:
+                error %= (100, action, str(e))
+                # The response becomes an exception that has a response attr
+                response = e
             log.critical(error)
         return response
 
@@ -199,6 +198,19 @@ class Request(object):
         """
         data = None
         response = self._send('GET', path, action, **parameters)
+
+        if isinstance(response, Exception) or response.status_code != 200:
+            return data, response
+
+        try:
+            data = response.text.strip()
+            if data and response.headers['Content-Type'].startswith('text/xml'):
+                xml = et.fromstring(data)
+                data = xml_to_data(xml)
+        except (et.ParseError, AttributeError), e:
+            log.critical('[101] Failed to parse response: ' + e.message)
+            reraise_exception(e)
+        return data, response
         if response.status_code != 200:
             return data, response
         try:
