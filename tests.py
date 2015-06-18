@@ -4,6 +4,7 @@ import os
 import json
 import time
 import logging
+import tempfile
 import pytest
 import ntplib
 import netstoragekit as ns
@@ -404,3 +405,32 @@ def test_real_dir_response():
     data, e = request.dir('/does-not-exist')
     assert data is None
     assert e.response.status_code == 404
+
+
+def test_mock_download_response():
+    # Mock response
+    sample_text = 'Lorem ipsum dolor sit amet.'
+    response_body = '\n'.join([sample_text for t in range(10)])
+
+    tmp = tempfile.NamedTemporaryFile(prefix=__name__, delete=False)
+    destination = tmp.name
+
+    mock_response = {'status': 200, 'content_type': 'text/plain', 'body': response_body}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    data, r = request.download('/dir/file.txt', destination)
+    assert data is None
+    assert r.status_code == 200
+    #assert r.headers['Content-Length'] == len(response_body)
+    assert len(tmp.read()) == len(response_body)
+
+    mock_response = {'status': 404, 'content_type': 'text/plain', 'body': 'Not Found'}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    data, e = request.download('/dir/file.txt', destination)
+    assert data is None
+    assert e.response.status_code == 404
+
+    mock_response = {'status': 200, 'content_type': 'text/plain', 'body': response_body}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    with pytest.raises(ns.exceptions.NetStorageKitError) as e:
+        data, e = request.download('/dir/file.txt', '/does/not/exist/dest')
+    assert 'No such file' in str(e)

@@ -194,10 +194,15 @@ class Request(object):
         See _send.
 
         Returns:
-            A Tuple (data, response|exception) where data is a Data (dictionary with
-            attribute-like access too) object with the translated response xml
-            content, and response is either the object as returned by requests,
+            A Tuple (data, response|exception).
+            Data is a Data (dictionary with attribute-like access too) object
+            with the response text, or the translated response xml content if
+            the content type is text/xml.
+            Response is either the object as returned by requests,
             or an exception also returned by requests, with a response attribute.
+
+            If self.parameters['stream'] is True, Data will be None because
+            the actual response should be processed by this method's caller.
         """
         data = None
         response = self._send('GET', path, action, **parameters)
@@ -206,12 +211,15 @@ class Request(object):
             return data, response
 
         try:
-            data = response.text.strip()
-            if data and response.headers['Content-Type'].startswith('text/xml'):
-                xml = et.fromstring(data)
-                data = xml_to_data(xml)
+            if self.parameters.get('stream') == True:
+                data = None
+            else:
+                data = response.text.strip()
+                if data and response.headers['Content-Type'].startswith('text/xml'):
+                    xml = et.fromstring(data)
+                    data = xml_to_data(xml)
         except (et.ParseError, AttributeError), e:
-            log.critical('[101] Failed to parse response: ' + e.message)
+            log.critical('[101] Failed to get response: ' + e.message)
             reraise_exception(e)
         return data, response
 
@@ -331,3 +339,28 @@ class Request(object):
             NetStorageKitError: A wrapper of any XML parsing error.
         """
         return self._send_read_action(path, 'dir')
+
+    def download(self, path, destination):
+        """File download.
+
+        Downloads the given path into the provided destination.
+
+        Args:
+            path: The remote path, without CPCode.
+            destination: The local path.
+        """
+        self.parameters['stream'] = True
+        _, response = self._send_read_action(path, 'download')
+
+        if isinstance(response, Exception):
+            return _, response
+
+        try:
+            with open(destination, 'wb') as f: # 100KB per write
+                for chunk in response.iter_content(chunk_size=100000):
+                    f.write(chunk)
+                    f.flush()
+        except Exception, e:
+            log.critical('[103] Failed to write in %s: %s' % (destination, str(e)))
+            reraise_exception(e)
+        return None, response
