@@ -172,14 +172,17 @@ class Request(object):
                                             hooks=hooks,
                                             timeout=timeout)
 
-            log.debug('Request: %s %s %s' % (action, url, parameters))
+            success = '[%s] Succeeded to call %s: %s %s'
+            success %= (response.status_code, action, url, parameters)
+            log.debug(success)
             response.raise_for_status()
         except Exception, e:
-            error = '[%s] Failed %s call: %s'
+            error = '[%s] Failed to call %s: %s %s'
             if response:
-                error %= (response.status_code, action, format_response(response))
+                error %= (response.status_code, action,
+                          str(e), format_response(response))
             else:
-                error %= (100, action, str(e))
+                error %= (100, action, str(e), '<empty response>')
                 # The response becomes an exception that has a response attr
                 response = e
             log.critical(error)
