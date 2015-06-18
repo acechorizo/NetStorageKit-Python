@@ -48,7 +48,7 @@ def test_local_clock():
     assert diff < 50, 'Local clock must be updated'
 
 
-def test_http_headers():
+def test_api_http_headers():
     key_name = 'key1'
     key = 'abcdefghij'
     host = 'key1'
@@ -110,6 +110,7 @@ def test_http_headers():
     parameters = {'md5': '0123456789abcdef0123456789abcdef', 'mtime': '1260000000'}
     _, r = request.mock(path=path, action='upload', **parameters)
 
+    # API headers
     assert r.request.headers['X-Akamai-ACS-Action'].replace('&format=xml', '') == expected_action
     assert r.request.headers['X-Akamai-ACS-Auth-Data'] == expected_data
     # The Request class includes the mandatory format parameter in the action
@@ -133,27 +134,27 @@ def test_mock_http_responses():
 
     # Secure Hostname
     request = ns.api.Request('test-key', '123', '12345', 'host', secure=True, testing=True)
-    _, response = request.mock()
-    assert response.url == 'https://host-nsu.akamaihd.net/12345/mock'
+    _, r = request.mock()
+    assert r.url == 'https://host-nsu.akamaihd.net/12345/mock'
 
     # Insecure Hostname
     request = ns.api.Request('test-key', '123', '12345', 'host', secure=False, testing=True)
-    _, response = request.mock()
-    assert response.url == 'http://host-nsu.akamaihd.net/12345/mock'
+    _, r = request.mock()
+    assert r.url == 'http://host-nsu.akamaihd.net/12345/mock'
 
     # Valid request
     mock_response = {'status': 200, 'content_type': 'text/html'}
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
-    _, response = request.mock()
-    assert response.status_code == 200
-    assert response.headers['Content-Type'] == 'text/html'
+    _, r = request.mock()
+    assert r.status_code == 200
+    assert r.headers['Content-Type'] == 'text/html'
 
     # Invalid request
     mock_response = {'status': 404, 'body': 'Not Found'}
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
-    _, response = request.mock()
-    assert response.status_code == 404
-    assert 'Not Found' in str(response.text)
+    _, e = request.mock()
+    assert e.response.status_code == 404
+    assert 'Not Found' in str(e.response.text)
 
 
 @real_netstorage_api_request
@@ -163,14 +164,16 @@ def test_real_http_failed_responses():
     # Service unavailable
     request = ns.api.Request('invalid_key_name', 'invalid_key',
                              'invalid_cpcode', 'invalid_host')
-    data, response = request.du('/')
-    assert data is None and response.status_code == 503
+    data, e = request.du('/')
+    assert data is None
+    assert e.response.status_code == 503
 
     # Forbidden
     request = ns.api.Request(test['key_name'], 'INVALID_KEY',
                              test['cpcode'], test['host'])
-    data, response = request.du('/')
-    assert data is None and response.status_code == 403
+    data, e = request.du('/')
+    assert data is None
+    assert e.response.status_code == 403
 
     # Test HTTP 403 Forbidden
 
@@ -179,16 +182,17 @@ def test_real_http_failed_responses():
     request = ns.api.Request(test['key_name'], test['key'],
                              test['cpcode'], test['host'],
                              timestamp=delayed_timestamp)
-    data, r = request.du('/')
+    data, e = request.du('/')
     assert data is None
-    assert r.status_code == 403
-
+    assert e.response.status_code == 403
 
     # Test HTTP 404 Not Found
 
     request = ns.api.Request(test['key_name'], test['key'],
                              test['cpcode'], test['host'])
-    data, r = request.du('/does-not-exist-%s' % time.time())
+    data, e = request.du('/does-not-exist-%s' % time.time())
+    assert data is None
+    assert e.response.status_code == 404
     assert data is None
     assert r.status_code == 404
 
@@ -238,8 +242,8 @@ def test_mock_du_response():
     """
     mock_response = {'status': 200, 'body': valid_mock_response_body}
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
-    data, response = request.du('/du/foo')
-    assert response.status_code == 200
+    data, r = request.du('/du/foo')
+    assert r.status_code == 200
     assert data.du.directory == '/du/foo'
     assert data.du['du-info'].files == '12399999'
     assert data.du['du-info'].bytes == '383838383838'
@@ -254,8 +258,8 @@ def test_mock_du_response():
     mock_response = {'status': 200, 'body': invalid_mock_response_body}
     with pytest.raises(ns.exceptions.NetStorageKitError) as e:
         request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
-        data, response = request.du('/du/foo')
-    assert response.status_code == 200
+        data, r = request.du('/du/foo')
+    assert r.status_code == 200
     assert 'ParseError' in str(e.value)
 
     # Unexpected response
@@ -268,7 +272,7 @@ def test_mock_du_response():
     # Incomplete response
     mock_response = {'status': 200, 'body': '<du/>'}
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
-    data, response = request.du('/')
+    data, r = request.du('/')
     assert data.du is None
 
 
@@ -279,7 +283,7 @@ def test_real_du_response():
     # Valid response
     request = ns.api.Request(test['key_name'], test['key'],
                              test['cpcode'], test['host'])
-    data, response = request.du('/')
+    data, r = request.du('/')
     assert data.du.directory.strip('/') == test['cpcode']
     assert data.du['du-info'].files
     assert data.du['du-info'].bytes
@@ -287,9 +291,9 @@ def test_real_du_response():
     # Invalid response
     request = ns.api.Request(test['key_name'], test['key'],
                              test['cpcode'], test['host'])
-    data, response = request.du('/does-not-exist')
+    data, e = request.du('/does-not-exist')
     assert data is None
-    assert response.status_code == 404
+    assert e.response.status_code == 404
 
 
 def test_mock_dir_response():
@@ -304,8 +308,8 @@ def test_mock_dir_response():
     """
     mock_response = {'status': 200, 'body': valid_mock_response_body}
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
-    data, response = request.dir('/dir/foo')
-    assert response.status_code == 200
+    data, r = request.dir('/dir/foo')
+    assert r.status_code == 200
     assert data.stat.directory == '/dir/foo'
     assert data.stat.file[0].name == 'a.jpg'
     assert data.stat.file[1].name == 'b.png'
@@ -322,8 +326,8 @@ def test_mock_dir_response():
     mock_response = {'status': 200, 'body': invalid_mock_response_body}
     with pytest.raises(ns.exceptions.NetStorageKitError) as e:
         request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
-        data, response = request.du('/dir/foo')
-    assert response.status_code == 200
+        data, r = request.du('/dir/foo')
+    assert r.status_code == 200
     assert 'ParseError' in str(e.value)
 
     # Unexpected response
@@ -336,7 +340,7 @@ def test_mock_dir_response():
     # Incomplete response
     mock_response = {'status': 200, 'body': '<stat/>'}
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
-    data, response = request.dir('/')
+    data, r = request.dir('/')
     assert data.stat is None
 
 
@@ -347,12 +351,12 @@ def test_real_dir_response():
     # Valid response
     request = ns.api.Request(test['key_name'], test['key'],
                              test['cpcode'], test['host'])
-    data, response = request.dir('/')
+    data, r = request.dir('/')
     assert data.stat.directory.strip('/') == test['cpcode']
 
     # Invalid response
     request = ns.api.Request(test['key_name'], test['key'],
                              test['cpcode'], test['host'])
-    data, response = request.dir('/does-not-exist')
+    data, e = request.dir('/does-not-exist')
     assert data is None
-    assert response.status_code == 404
+    assert e.response.status_code == 404
