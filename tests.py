@@ -131,11 +131,6 @@ def test_http_parameters():
 
 def test_mock_http_responses():
 
-    def make_callback(code):
-        def callback(response, *args, **kwargs):
-            assert response.status_code == code
-        return callback
-
     # Secure Hostname
     request = ns.api.Request('test-key', '123', '12345', 'host', secure=True, testing=True)
     _, response = request.mock()
