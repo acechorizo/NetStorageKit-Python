@@ -31,7 +31,7 @@ test_credentials = get_test_credentials()
 
 
 # Decorator that runs tests only if there are test credentials
-real_http_request = pytest.mark.skipif(test_credentials is None,
+real_netstorage_api_request = pytest.mark.skipif(test_credentials is None,
     reason='The test credentials .json file was not found in ~')
 
 
@@ -161,7 +161,7 @@ def test_mock_http_responses():
     assert 'Not Found' in str(response.text)
 
 
-@real_http_request
+@real_netstorage_api_request
 def test_real_http_failed_responses():
     test = test_credentials
 
@@ -198,7 +198,7 @@ def test_real_http_failed_responses():
     assert r.status_code == 404
 
 
-@real_http_request
+@real_netstorage_api_request
 def test_real_http_successful_responses():
     test = test_credentials
 
@@ -277,7 +277,7 @@ def test_mock_du_response():
     assert data.du is None
 
 
-@real_http_request
+@real_netstorage_api_request
 def test_real_du_response():
     test = test_credentials
 
@@ -345,7 +345,7 @@ def test_mock_dir_response():
     assert data.stat is None
 
 
-@real_http_request
+@real_netstorage_api_request
 def test_real_dir_response():
     test = test_credentials
 
