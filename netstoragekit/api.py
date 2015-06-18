@@ -211,6 +211,27 @@ class Request(object):
             log.critical('[101] Failed to parse response: ' + e.message)
             reraise_exception(e)
         return data, response
+
+    def _send_write_action(self, path, action, data, **parameters):
+        """Sends a write API request and parses its response.
+
+        See _send.
+
+        TODO: Support form uploads.
+
+        Returns:
+            A Tuple (data, response|exception) where data is a Data (dictionary with
+            attribute-like access too) object with the translated response xml
+            content, and response is either the object as returned by requests,
+            or an exception also returned by requests, with a response attribute.
+        """
+        if data:
+            self.parameters.headers['Content-Length'] = len(data)
+        response = self._send('POST', path, action, data, **parameters)
+
+        # Response data
+        data = None
+
         if response.status_code != 200:
             return data, response
         try:
@@ -219,9 +240,10 @@ class Request(object):
                 xml = et.fromstring(body)
                 data = xml_to_data(xml)
         except (et.ParseError, AttributeError), e:
-            log.critical('[101] Failed to parse response: ' + e.message)
+            log.critical('[102] Failed to parse response: ' + e.message)
             reraise_exception(e)
         return data, response
+
 
     # API calls
     # All paths should be relative to the CPCode directory
@@ -243,6 +265,8 @@ class Request(object):
             1. The relevant data as a dict, currently just None.
             2. The mock response as returned by requests.
         """
+        if method == 'POST':
+            return self._send_write_action(path, action, data=data, **parameters)
         return self._send_read_action(path, action, **parameters)
 
     def du(self, path):
