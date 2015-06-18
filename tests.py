@@ -5,6 +5,7 @@ import json
 import time
 import logging
 import pytest
+import ntplib
 import netstoragekit as ns
 
 # Configure the logging level and stream to stdout to see the logs.
@@ -35,6 +36,17 @@ real_http_request = pytest.mark.skipif(test_credentials is None,
 
 
 ### Tests
+
+def test_local_clock():
+    # Local clock must be within one minute of the actual time
+    # according to the docs, but in practice, ~50 seconds of difference
+    # are enough to get a request rejected
+    client = ntplib.NTPClient()
+    response = client.request('time1.google.com')
+    remote_time = (response.tx_time + response.offset)
+    diff = abs(remote_time - time.time())
+    assert diff < 50, 'Local clock must be updated'
+
 
 def test_http_headers():
     key_name = 'key1'

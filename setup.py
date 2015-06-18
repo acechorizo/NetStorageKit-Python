@@ -11,7 +11,8 @@ setup(
     install_requires=[
         'requests',
         'responses',
-        'pytest'
+        'pytest',
+        'ntplib',
         'requests[security]'
     ],
     data_files=[(expanduser('~'), ['netstoragekit_test_credentials.json.dist'])]
