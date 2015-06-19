@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from sys import exc_info
+import traceback
 from urllib import quote_plus
 from collections import defaultdict
 from .exceptions import NetStorageKitError
@@ -11,6 +12,11 @@ def reraise_exception(exception):
     """
     type_, value, traceback = exc_info()
     raise NetStorageKitError, '%s(%s)' % (type_.__name__, value), traceback
+
+
+def format_exception():
+    """Formats the last exception."""
+    return traceback.format_exc()
 
 
 def escape(value):
