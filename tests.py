@@ -36,6 +36,16 @@ real_netstorage_api_request = pytest.mark.skipif(test_credentials is None,
     reason='The test credentials .json file was not found in ~')
 
 
+def get_sample_text():
+    lorem = 'Lorem ipsum dolor sit amet.'
+    return '\n'.join([lorem for t in range(100)])
+
+def get_temp_file(contents=None):
+    file = tempfile.NamedTemporaryFile(prefix=__name__, delete=False)
+    if contents:
+        open(file.name, 'wb').write(contents)
+    return file
+
 ### Tests
 
 def test_local_clock():
@@ -147,7 +157,8 @@ def test_http_parameters():
 
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=True)
     # Parameters should be properly escaped as part of the action header
-    parameters = {'p1': 'Simple text', 'p2': 'mamá', 'p3': u's\xe9'}
+    parameters = {'p1': 'Simple text', 'p2': 'mamá', 'p3': u's\xe9',
+                  'size': 0, 'foo': None}
     _, r = request.mock(**parameters)
     expected_quoted_params = 'p1=Simple+text&p2=mam%C3%A1&p3=s%C3%A9'
     assert r.request.headers['X-Akamai-ACS-Action'].find(expected_quoted_params) > 0
@@ -409,23 +420,21 @@ def test_real_dir_response():
 
 def test_mock_download_response():
     # Mock response
-    sample_text = 'Lorem ipsum dolor sit amet.'
-    response_body = '\n'.join([sample_text for t in range(10)])
+    response_body = get_sample_text()
 
-    tmp = tempfile.NamedTemporaryFile(prefix=__name__, delete=False)
-    destination = tmp.name
+    destination = get_temp_file()
 
     mock_response = {'status': 200, 'content_type': 'text/plain', 'body': response_body}
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
-    data, r = request.download('/dir/file.txt', destination)
+    data, r = request.download('/dir/file.txt', destination.name)
     assert data is None
     assert r.status_code == 200
     #assert r.headers['Content-Length'] == len(response_body)
-    assert len(tmp.read()) == len(response_body)
+    assert len(destination.read()) == len(response_body)
 
     mock_response = {'status': 404, 'content_type': 'text/plain', 'body': 'Not Found'}
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
-    data, e = request.download('/dir/file.txt', destination)
+    data, e = request.download('/dir/file.txt', destination.name)
     assert data is None
     assert e.response.status_code == 404
 
@@ -434,3 +443,45 @@ def test_mock_download_response():
     with pytest.raises(ns.exceptions.NetStorageKitError) as e:
         data, e = request.download('/dir/file.txt', '/does/not/exist/dest')
     assert 'No such file' in str(e)
+
+    os.unlink(destination.name)
+
+
+def test_mock_upload_response():
+    # Mock response
+
+    source = get_temp_file()
+
+    mock_response = {'status': 200, 'content_type': 'text/plain'}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    data, r = request.upload('/dir/file.txt', source.name)
+
+    assert data is None
+    assert r.status_code == 200
+
+
+@real_netstorage_api_request
+def test_real_upload_download_response():
+    test = test_credentials
+
+    path = 'netstoragekit_test_file.txt'
+
+    sample_text = get_sample_text()
+    # The file to upload
+    upload_file = get_temp_file(sample_text)
+    # The destination file
+    download_file = get_temp_file()
+
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
+
+    # Upload a file first
+    data, r = request.upload(path, upload_file.name)
+    assert data is None
+    assert r.status_code == 200
+
+    # Then download it back and compare the contents
+    data, r = request.download(path, download_file.name)
+    downloaded_content = download_file.read()
+    assert downloaded_content == sample_text
+    assert len(downloaded_content) == r.request.headers['Content-Length']

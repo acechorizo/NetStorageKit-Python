@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+from hashlib import sha256
 import requests
 import responses
 from .exceptions import NetStorageKitError
@@ -242,7 +243,8 @@ class Request(object):
             or an exception also returned by requests, with a response attribute.
         """
         if data:
-            self.parameters.headers['Content-Length'] = len(data)
+            self.parameters.setdefault('headers', {})
+            self.parameters['headers']['Content-Length'] = len(data)
         response = self._send('POST', path, action, data, **parameters)
 
         # Response data
@@ -252,8 +254,8 @@ class Request(object):
             return data, response
         try:
             body = response.text.strip()
-            if body:
-                xml = et.fromstring(body)
+            if data and response.headers['Content-Type'].startswith('text/xml'):
+                xml = et.fromstring(data)
                 data = xml_to_data(xml)
         except (et.ParseError, AttributeError), e:
             log.critical('[102] Failed to parse response: ' + e.message)
@@ -353,6 +355,12 @@ class Request(object):
         Args:
             path: The remote path, without CPCode.
             destination: The local path.
+
+        Returns:
+            A tuple consisting of:
+            1. None, for there is no success/failure confirmation other than
+                the response's status code.
+            2. The response as returned by requests.
         """
         self.parameters['stream'] = True
         _, response = self._send_read_action(path, 'download')
@@ -367,5 +375,38 @@ class Request(object):
                     f.flush()
         except Exception, e:
             log.critical('[103] Failed to write in %s: %s' % (destination, str(e)))
+            reraise_exception(e)
+        return None, response
+
+    def upload(self, path, source):
+        """File upload.
+
+        Uploads the given path from the provided source.
+        The sha256 checksum is computed automatically.
+
+        Binary upload support only.
+
+        Args:
+            path: The remote path, without CPCode.
+            destination: The local path.
+
+        Returns:
+            A tuple consisting of:
+            1. None, for there is no success/failure confirmation other than
+                the response's status code.
+            2. The response as returned by requests.
+        """
+        try:
+            data = None
+            with open(source, 'r') as f: # 100KB per write
+                data = f.read()
+            sha256_sum = sha256(data).hexdigest()
+            parameters = {
+                'sha256': sha256_sum,
+                'size': len(data),
+                'upload-type': 'binary'}
+            _, response = self._send_write_action(path, 'upload', data, **parameters)
+        except Exception, e:
+            log.critical('[104] Failed to read/upload %s: %s' % (source, str(e)))
             reraise_exception(e)
         return None, response
