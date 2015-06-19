@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from sys import exc_info
+from urllib import quote_plus
 from collections import defaultdict
 from .exceptions import NetStorageKitError
 
@@ -10,6 +11,14 @@ def reraise_exception(exception):
     """
     type_, value, traceback = exc_info()
     raise NetStorageKitError, '%s(%s)' % (type_.__name__, value), traceback
+
+
+def escape(value):
+    """Escapes the value to use it as a query string parameter."""
+    if value is None:
+        return ''
+    string = str(value.encode('utf-8') if type(value) is unicode else value)
+    return quote_plus(string)
 
 
 def get_remote_path(cpcode, path):

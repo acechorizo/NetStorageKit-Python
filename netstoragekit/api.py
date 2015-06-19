@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
 import logging
-from urllib import quote_plus
 import requests
 import responses
 from .exceptions import NetStorageKitError
 from .auth import get_data, get_sign
-from .utils import format_response, get_remote_path, reraise_exception, xml_to_data
+from .utils import (
+    escape,
+    format_exception,
+    format_response,
+    get_remote_path,
+    reraise_exception,
+    xml_to_data)
 try:
     import xml.etree.cElementTree as et
 except ImportError:
@@ -65,7 +70,6 @@ class Request(object):
             The action header as a dict.
         """
         # Escape the parameters
-        escape = lambda v: quote_plus(str(v.encode('utf-8')) if type(v) is unicode else v)
         values = {'version': 1, 'action': action, 'format': 'xml'}
         values.update({k: escape(v) for k, v in parameters.items()})
         # The query string parameters must sorted alphabetically
