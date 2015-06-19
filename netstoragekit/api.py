@@ -149,7 +149,7 @@ class Request(object):
         """
         headers = self.parameters.get('headers', {})
         hooks = self.parameters.get('hooks', {})
-        timeout = self.parameters.get('timeout', 5)
+        timeout = self.parameters.get('timeout', 15)
         response = None
         try:
             remote_path = get_remote_path(self.cpcode, path)
