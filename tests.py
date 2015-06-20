@@ -451,19 +451,58 @@ def test_mock_upload_response():
     # Mock response
 
     source = get_temp_file()
+    confirmation = '<HTML>Request Processed</HTML>'
 
-    mock_response = {'status': 200, 'content_type': 'text/plain'}
+    mock_response = {'status': 200, 'content_type': 'text/plain',
+                     'body': confirmation}
     request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
     data, r = request.upload('/dir/file.txt', source.name)
 
     assert data is None
     assert r.status_code == 200
+    assert r.text == confirmation
+
+
+def test_mock_delete_response():
+
+    confirmation = '<HTML>Request Processed</HTML>'
+
+    # Upload a file first
+    response_body = get_sample_text()
+    sample_text = get_sample_text()
+    upload_file = get_temp_file(sample_text)
+
+    mock_response = {'status': 200, 'content_type': 'text/plain',
+                     'body': confirmation}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    _, r = request.upload('/dir/file.txt', upload_file.name)
+    assert r.text == confirmation
+
+    # Delete the file
+    mock_response = {'status': 200, 'content_type': 'text/plain',
+                     'body': confirmation}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    data, r = request.delete('/dir/file.txt')
+    assert data is None
+    assert r.status_code == 200
+    assert r.text == confirmation
+
+    # The file no longer exist
+    mock_response = {'status': 404, 'content_type': 'text/plain', 'body': 'Not Found'}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    data, e = request.download('/dir/file.txt', upload_file.name)
+    assert data is None
+    assert e.response.status_code == 404
+    assert r.text == confirmation
+
+    os.unlink(upload_file.name)
 
 
 @real_netstorage_api_request
-def test_real_upload_download_response():
+def test_real_upload_download_delete_response():
     test = test_credentials
 
+    confirmation = '<HTML>Request Processed</HTML>\n'
     path = 'netstoragekit_test_file.txt'
 
     sample_text = get_sample_text()
@@ -472,16 +511,38 @@ def test_real_upload_download_response():
     # The destination file
     download_file = get_temp_file()
 
-    request = ns.api.Request(test['key_name'], test['key'],
-                             test['cpcode'], test['host'])
 
     # Upload a file first
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
     data, r = request.upload(path, upload_file.name)
     assert data is None
     assert r.status_code == 200
-
+    assert r.text == confirmation
+    time.sleep(.5)
     # Then download it back and compare the contents
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
     data, r = request.download(path, download_file.name)
-    downloaded_content = download_file.read()
-    assert downloaded_content == sample_text
-    assert len(downloaded_content) == r.request.headers['Content-Length']
+    assert data is None
+    assert r.status_code == 200
+    assert r.text == sample_text
+    assert download_file.read() == sample_text
+    time.sleep(.5)
+    # Then delete the file
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
+    data, r = request.delete(path)
+    assert data is None
+    assert r.status_code == 200
+    assert r.text == confirmation
+    time.sleep(.5)
+    # Make sure the file is no longer online
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
+    data, e = request.download(path, '/dev/null')
+    assert data is None
+    assert e.response.status_code == 404
+    
+    os.unlink(upload_file.name)
+    os.unlink(download_file.name)

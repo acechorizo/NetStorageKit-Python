@@ -234,6 +234,9 @@ class Request(object):
 
         See _send.
 
+        These responses return the following body:
+            <HTML>Request Processed</HTML>
+
         TODO: Support form uploads.
 
         Returns:
@@ -410,3 +413,17 @@ class Request(object):
             log.critical('[104] Failed to read/upload %s: %s' % (source, str(e)))
             reraise_exception(e)
         return None, response
+
+    def delete(self, path):
+        """File or symlink deletion.
+
+        Args:
+            path: The remote path, without CPCode.
+
+        Returns:
+            A tuple consisting of:
+            1. None, for there is no success/failure confirmation other than
+                the response's status code.
+            2. The response as returned by requests.
+        """
+        return self._send_write_action(path, 'delete', None)
