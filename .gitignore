@@ -5,3 +5,4 @@ dist/
 _docs/
 *.egg-info/
 __pycache__
+.coverage
