@@ -519,7 +519,7 @@ def test_real_upload_download_delete_response():
     assert data is None
     assert r.status_code == 200
     assert r.text == confirmation
-    time.sleep(.5)
+    time.sleep(1.5)
     # Then download it back and compare the contents
     request = ns.api.Request(test['key_name'], test['key'],
                              test['cpcode'], test['host'])
@@ -528,7 +528,7 @@ def test_real_upload_download_delete_response():
     assert r.status_code == 200
     assert r.text == sample_text
     assert download_file.read() == sample_text
-    time.sleep(.5)
+    time.sleep(1.5)
     # Then delete the file
     request = ns.api.Request(test['key_name'], test['key'],
                              test['cpcode'], test['host'])
@@ -536,7 +536,7 @@ def test_real_upload_download_delete_response():
     assert data is None
     assert r.status_code == 200
     assert r.text == confirmation
-    time.sleep(.5)
+    time.sleep(1.5)
     # Make sure the file is no longer online
     request = ns.api.Request(test['key_name'], test['key'],
                              test['cpcode'], test['host'])
