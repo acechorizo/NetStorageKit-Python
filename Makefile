@@ -1,3 +1,7 @@
+.PHONY: clean dist test
+
+clean:
+	rm -rf __pycache__ build dist
 
 dist:
 	python setup.py register
