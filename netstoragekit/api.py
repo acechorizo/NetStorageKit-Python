@@ -253,8 +253,9 @@ class Request(object):
         # Response data
         data = None
 
-        if response.status_code != 200:
+        if isinstance(response, Exception) or response.status_code != 200:
             return data, response
+        
         try:
             body = response.text.strip()
             if data and response.headers['Content-Type'].startswith('text/xml'):
