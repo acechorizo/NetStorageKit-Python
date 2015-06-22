@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='NetStorageKit',
-    version='1.0.0',
+    version='1.0.1',
     description='Akamai\'s NetStorage API communication kit',
     author='Ernesto Mendoza Blanco',
     author_email='ernestom@mentanetwork.com',
