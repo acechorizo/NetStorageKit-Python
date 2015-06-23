@@ -1,0 +1,1 @@
+include LICENSE README.md netstoragekit_test_credentials.json.dist tests.py 

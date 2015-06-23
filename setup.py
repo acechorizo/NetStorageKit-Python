@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='NetStorageKit',
-    version='1.0.1',
+    version='1.0.3',
     description='Akamai\'s NetStorage API communication kit',
     author='Ernesto Mendoza Blanco',
     author_email='ernestom@mentanetwork.com',
@@ -18,6 +18,8 @@ setup(
     ],
     url='https://github.com/MentaNetwork/NetStorageKit-Python',
     download_url='https://github.com/MentaNetwork/NetStorageKit-Python',
+    package_data={'': ['*.json.dist']},
+    include_package_data=True,
     data_files=[(expanduser('~'), ['netstoragekit_test_credentials.json.dist'])],
     classifiers=[
         'Development Status :: 5 - Production/Stable',

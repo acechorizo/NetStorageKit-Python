@@ -3,7 +3,7 @@
 clean:
 	rm -rf __pycache__ build dist
 
-dist:
+dist: clean
 	python setup.py register
 	python setup.py bdist_wheel upload
 	python setup.py bdist_egg upload
