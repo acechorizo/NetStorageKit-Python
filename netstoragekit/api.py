@@ -392,7 +392,7 @@ class Request(object):
 
         Args:
             path: The remote path, without CPCode.
-            destination: The local path.
+            source: The local path.
 
         Returns:
             A tuple consisting of:
@@ -402,7 +402,7 @@ class Request(object):
         """
         try:
             data = None
-            with open(source, 'r') as f: # 100KB per write
+            with open(source, 'r') as f:
                 data = f.read()
             sha256_sum = sha256(data).hexdigest()
             parameters = {
