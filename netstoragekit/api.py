@@ -259,7 +259,7 @@ class Request(object):
 
         if isinstance(response, Exception) or response.status_code != 200:
             return data, response
-        
+
         try:
             body = response.text.strip()
             if data and response.headers['Content-Type'].startswith('text/xml'):
@@ -432,3 +432,39 @@ class Request(object):
             2. The response as returned by requests.
         """
         return self._send_write_action(path, 'delete', None)
+
+    def quick_delete(self, path, im_really_really_sure=False):
+        """Directory 'quick delete' deletion.
+
+        Quoting the docs:
+
+        'The quick-delete action is disabled by default for security reasons,
+        as it allows recursive removal of non-empty directory structures
+        in a matter of seconds.
+        If you wish to enable this feature, please contact your Account
+        Representative with the NetStorage CPCode(s) for which you wish
+        to use this feature.'
+
+        Args:
+            path: The remote path, without CPCode.
+            im_really_really_sure: It must be the string 'imreallyreallysure'.
+
+        Returns:
+            A tuple consisting of:
+            1. None, for there is no success/failure confirmation other than
+                the response's status code.
+            2. The response as returned by requests.
+        """
+        if not im_really_really_sure or im_really_really_sure != 'imreallyreallysure':
+            return None, None
+        else:
+            log.critical('Quick-deleting %s' % path)
+
+        parameters = {'imreallyreallysure': im_really_really_sure}
+        try:
+            _, response = self._send_write_action(path, 'quick-delete', None, **parameters)
+        except Exception, e:
+            log.critical('[105] Failed to quick-delete %s: %s' % (path, str(e)))
+            log.warning('The quick-delete call must be enabled by Akamai for this CPCode')
+            reraise_exception(e)
+        return None, response

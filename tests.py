@@ -493,7 +493,6 @@ def test_mock_delete_response():
     data, e = request.download('/dir/file.txt', upload_file.name)
     assert data is None
     assert e.response.status_code == 404
-    assert r.text == confirmation
 
     os.unlink(upload_file.name)
 
@@ -546,3 +545,128 @@ def test_real_upload_download_delete_response():
     
     os.unlink(upload_file.name)
     os.unlink(download_file.name)
+
+
+def test_mock_quickdelete_response():
+
+    confirmation = '<HTML>Request Processed</HTML>'
+
+    # Upload a file first
+    response_body = get_sample_text()
+    sample_text = get_sample_text()
+    upload_file = get_temp_file(sample_text)
+
+    mock_response = {'status': 200, 'content_type': 'text/plain',
+                     'body': confirmation}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    _, r = request.upload('/dir/file.txt', upload_file.name)
+    assert r.text == confirmation
+
+    # Attempt to delete the directory
+
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=True)
+    data, r = request.quick_delete('/dir')
+    assert data is None
+    assert r is None
+
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=True)
+    data, r = request.quick_delete('/dir', im_really_really_sure='not yet')
+    assert data is None
+    assert r is None
+
+    # The directory should still be there
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=True)
+    data, r = request.dir('/dir')
+    assert data is not None
+    assert r.status_code == 200
+
+    # Now really delete it
+    mock_response = {'status': 200, 'content_type': 'text/plain',
+                     'body': confirmation}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    data, r = request.quick_delete('/dir', im_really_really_sure='imreallyreallysure')
+    assert r.text == confirmation
+    assert r.status_code == 200
+
+
+    # The directory should not exist
+    mock_response = {'status': 404, 'content_type': 'text/plain', 'body': 'Not Found'}
+    request = ns.api.Request('test-key', '123', '12345', 'host', testing=mock_response)
+    data, e = request.dir('/dir')
+    assert data is None
+    assert e.response.status_code == 404
+
+
+    os.unlink(upload_file.name)
+
+
+@real_netstorage_api_request
+def test_real_quickdelete_response():
+    test = test_credentials
+
+    confirmation = '<HTML>Request Processed</HTML>\n'
+    path = 'tests/quick_del_dir/subdir/netstoragekit_test_file.txt'
+
+    sample_text = get_sample_text()
+    # The file to upload
+    upload_file = get_temp_file(sample_text)
+
+    # Upload a file first
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
+    data, r = request.upload(path, upload_file.name)
+    assert data is None
+    assert r.status_code == 200
+    assert r.text == confirmation
+
+    # Attempt to delete the directory
+
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
+    data, r = request.quick_delete('tests/quick_del_dir')
+    assert data is None
+    assert r is None
+
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
+    data, r = request.quick_delete('tests/quick_del_dir',
+                                   im_really_really_sure='yes')
+    assert data is None
+    assert r is None
+
+    # The directory should still be there
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
+    data, r = request.dir('tests/quick_del_dir')
+    assert data is not None
+    assert r.status_code == 200
+
+    # Now really delete it
+    request = ns.api.Request(test['key_name'], test['key'],
+                             test['cpcode'], test['host'])
+
+    # This feature must be enabled by Akamai on a per CPCode basis,
+    # and thus we should tolerate failures to a certain extent
+    data, r = request.quick_delete('tests/quick_del_dir',
+                                   im_really_really_sure='imreallyreallysure')
+    # Feature is disabled (Akamai default)
+    if isinstance(r, Exception):
+        assert 'Bad Request' in str(r)
+    else:
+        assert r.text == confirmation
+        assert r.status_code == 200
+
+        # The directory and file should not exist
+        request = ns.api.Request(test['key_name'], test['key'],
+                                 test['cpcode'], test['host'])
+        data, e = request.dir('tests/quick_del_dir')
+        assert data is None
+        assert e.response.status_code == 404
+
+        request = ns.api.Request(test['key_name'], test['key'],
+                                 test['cpcode'], test['host'])
+        data, e = request.download(path, '/dev/null')
+        assert data is None
+        assert e.response.status_code == 404
+
+    os.unlink(upload_file.name)
