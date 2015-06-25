@@ -40,6 +40,10 @@ class Request(object):
                 - status: The mock HTTP status code.
                 - content_type: The mock content_type response header.
                 - body: The mock response body.
+                This parameter makes use of getsentry/responses, and that module
+                is not thread safe. 
+                Using it while being called inside a thread will yield 
+                "AssertionError: Not all requests has been executed" errors.
             **parameters: Extra request parameters, e.g. headers, hooks, timeout.
         """
         self.key_name = key_name
