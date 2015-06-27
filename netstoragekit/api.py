@@ -460,7 +460,7 @@ class Request(object):
         else:
             log.critical('Quick-deleting %s' % path)
 
-        parameters = {'imreallyreallysure': im_really_really_sure}
+        parameters = {'quick-delete': im_really_really_sure}
         try:
             _, response = self._send_write_action(path, 'quick-delete', None, **parameters)
         except Exception, e:

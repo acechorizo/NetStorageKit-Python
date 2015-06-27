@@ -651,7 +651,7 @@ def test_real_quickdelete_response():
                                    im_really_really_sure='imreallyreallysure')
     # Feature is disabled (Akamai default)
     if isinstance(r, Exception):
-        assert 'Bad Request' in str(r)
+        assert 'Client Error' in str(r)
     else:
         assert r.text == confirmation
         assert r.status_code == 200
