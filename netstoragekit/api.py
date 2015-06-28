@@ -183,16 +183,16 @@ class Request(object):
 
             success = '[%s] Succeeded to call %s: %s %s'
             success %= (response.status_code, action, url, parameters)
-            log.debug(success)
+            log.info(success)
             response.raise_for_status()
         except Exception, e:
-            error = '[%s] Failed to call %s: %s %s %s'
+            error = '[%s] Failed to call %s %s: %s %s %s'
             tb = format_exception()
             if response:
-                error %= (response.status_code, action,
+                error %= (response.status_code, action, url,
                           str(e), format_response(response), tb)
             else:
-                error %= (100, action, str(e), '<empty response>', tb)
+                error %= (100, action, url, str(e), '<empty response>', tb)
                 # The response becomes an exception that has a response attr
                 response = e
             log.critical(error)
