@@ -1,3 +1,5 @@
+# NetStorage communication Kit [![PyPI](https://img.shields.io/pypi/status/Django.svg?style=flat-square)](https://pypi.python.org/pypi/NetStorageKit)
+
 ## Usage
 
 The [tests](tests.py) describe the usage thoroughly, but consider this upload example.
@@ -40,5 +42,5 @@ py.test tests.py
 ### Production
 
 ```shell
-python setup.py install
+pip install netstoragekit
 ```
