@@ -2,10 +2,14 @@
 from os.path import expanduser
 from setuptools import setup
 
+with open('README.rst', 'r') as f:
+    readme = f.read()
+
 setup(
     name='NetStorageKit',
-    version='1.0.7',
+    version='1.0.8',
     description='Akamai\'s NetStorage API communication kit',
+    long_description=readme,
     author='Ernesto Mendoza Blanco',
     author_email='ernestom@mentanetwork.com',
     install_requires=[
