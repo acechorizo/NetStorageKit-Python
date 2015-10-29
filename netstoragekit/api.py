@@ -355,6 +355,30 @@ class Request(object):
         """
         return self._send_read_action(path, 'dir')
 
+    def stat(self, path):
+        """Stat file or directory.
+
+        Specify this action to return the stat structure of a named file/directory/symbolic link.
+        
+        Example response:
+            
+            <stat directory="/dir1/dir2">
+                <file type="file" name="file.html" mtime="1260000000" size="1234567" md5="0123456789abcdef0123456789abcdef" />
+            </stat>
+        
+        Args:
+            path: The remote path, without CPCode.
+
+        Returns:
+            A tuple consisting of:
+            1. The relevant data (parsed xml) as a dict.
+            2. The response as returned by requests.
+
+        Raises:
+            NetStorageKitError: A wrapper of any XML parsing error.
+        """
+        return self._send_read_action(path, 'stat')
+
     def download(self, path, destination):
         """File download.
 
@@ -397,6 +421,7 @@ class Request(object):
         Args:
             path: The remote path, without CPCode.
             source: The local path.
+            ***changing source to file object, not string to local path
 
         Returns:
             A tuple consisting of:
@@ -405,9 +430,10 @@ class Request(object):
             2. The response as returned by requests.
         """
         try:
-            data = None
-            with open(source, 'r') as f:
-                data = f.read()
+            #data = None
+            #with open(source, 'r') as f:
+            #    data = f.read()
+            data = source
             sha256_sum = sha256(data).hexdigest()
             parameters = {
                 'sha256': sha256_sum,
@@ -415,7 +441,9 @@ class Request(object):
                 'upload-type': 'binary'}
             _, response = self._send_write_action(path, 'upload', data, **parameters)
         except Exception, e:
-            log.critical('[104] Failed to read/upload %s: %s' % (source, str(e)))
+            log.critical('[104] Failed to read/upload: %s' % str(e))
+            #log.critical('[104] Failed to read/upload %s: %s' % (source, str(e)))
+            
             reraise_exception(e)
         return None, response
 
