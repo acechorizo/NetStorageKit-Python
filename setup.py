@@ -7,7 +7,7 @@ with open('README.rst', 'r') as f:
 
 setup(
     name='NetStorageKit',
-    version='1.0.8',
+    version='1.0.9',
     description='Akamai\'s NetStorage API communication kit',
     long_description=readme,
     author='Ernesto Mendoza Blanco',
