@@ -20,8 +20,8 @@ setup(
         'pytest-cov',
         'requests[security]'
     ],
-    url='https://github.com/MentaNetwork/NetStorageKit-Python',
-    download_url='https://github.com/MentaNetwork/NetStorageKit-Python',
+    url='https://github.com/acechorizo/NetStorageKit-Python',
+    download_url='https://github.com/acechorizo/NetStorageKit-Python',
     packages=['netstoragekit'],
     package_dir={'netstoragekit': 'netstoragekit'},
     package_data={'': ['*.json.dist']},
